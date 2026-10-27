@@ -103,4 +103,11 @@ static class TapCommands
 	/// <see cref="AddChild"/> inserts. A tap that applies <see cref="AddChild"/> serves it.
 	/// </summary>
 	public const string CreateInstance = "CreateInstance";
+
+	/// <summary>
+	/// A command inside an <see cref="Apply"/> batch rather than an edit kind: puts what a slot built behind a key
+	/// in the target's resource dictionary. A <see cref="SetResource"/> edit is sent as the
+	/// <see cref="CreateInstance"/> commands that build the resource, then one of these.
+	/// </summary>
+	public const string ReplaceResource = "ReplaceResource";
 }

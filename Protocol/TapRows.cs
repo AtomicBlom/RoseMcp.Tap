@@ -169,12 +169,22 @@ static class TapRows
 }
 
 /// <summary>One command of an <see cref="TapCommands.Apply"/> batch, as <see cref="TapRows.ReadCommand"/> reads it.</summary>
-/// <param name="Op">What to do: an edit kind, or <see cref="TapCommands.CreateInstance"/>.</param>
-/// <param name="Target">The address of the element it acts on, or a slot name an earlier command in the batch created.</param>
-/// <param name="Property">The property it sets or clears, or the type <see cref="TapCommands.CreateInstance"/> creates.</param>
+/// <param name="Op">
+/// What to do: <see cref="TapCommands.SetProperty"/>, <see cref="TapCommands.ClearProperty"/>,
+/// <see cref="TapCommands.AddChild"/>, <see cref="TapCommands.RemoveChild"/>, <see cref="TapCommands.CreateInstance"/>
+/// or <see cref="TapCommands.ReplaceResource"/>.
+/// </param>
+/// <param name="Target">
+/// The address of the element it acts on; for <see cref="TapCommands.CreateInstance"/>, the slot name the new
+/// element is known by to the commands after it in the batch.
+/// </param>
+/// <param name="Property">
+/// The property it sets or clears, the type <see cref="TapCommands.CreateInstance"/> creates, or the key
+/// <see cref="TapCommands.ReplaceResource"/> replaces.
+/// </param>
 /// <param name="ValueType">The type the value is written in, where the markup says.</param>
 /// <param name="Value">The value, as markup text.</param>
-/// <param name="Arg">The child an <see cref="TapCommands.AddChild"/> inserts, or the resource key a <see cref="TapCommands.SetResource"/> replaces.</param>
+/// <param name="Arg">The slot an <see cref="TapCommands.AddChild"/> inserts, or the slot a <see cref="TapCommands.ReplaceResource"/> puts behind its key.</param>
 /// <param name="Index">Where among the target's children an <see cref="TapCommands.AddChild"/> inserts.</param>
 #if ROSEMCP_TAP_PUBLIC
 public
