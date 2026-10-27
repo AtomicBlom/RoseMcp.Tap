@@ -1,0 +1,4 @@
+# The sources are compiled into other repositories whose formatting check fails on any other line ending,
+# on every operating system a checkout is made on.
+* text=auto eol=crlf
+*.png binary
