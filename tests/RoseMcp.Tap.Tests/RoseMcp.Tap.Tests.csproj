@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="TUnit.Core" />
+    <PackageReference Include="TUnit.Engine" />
+    <PackageReference Include="Shouldly" />
+  </ItemGroup>
+
+  <!-- The contract compiled in as source, exactly as every consumer takes it. -->
+  <ItemGroup>
+    <Compile Include="..\..\Protocol\*.cs" Link="Protocol\%(Filename)%(Extension)" />
+    <Compile Include="..\..\Endpoint\*.cs" Link="Endpoint\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- Built first and found by path rather than referenced: see StubTap.csproj. -->
+  <ItemGroup>
+    <ProjectReference Include="..\StubTap\StubTap.csproj" ReferenceOutputAssembly="false" />
+    <AssemblyMetadata Include="StubTapPath" Value="$(MSBuildThisFileDirectory)..\StubTap\bin\$(Configuration)\$(TargetFramework)\StubTap.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="TUnit.Core" />
+    <Using Include="Shouldly" />
+  </ItemGroup>
+
+</Project>

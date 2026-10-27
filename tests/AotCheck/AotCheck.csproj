@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Compiles the contract the way a framework that is NativeAOT-clean compiles it: with the trim and AOT
+       analyzers on and every warning an error. A framework guards the endpoint behind a feature switch, and
+       that only quiets its analyzers if every path into reflection here is annotated. -->
+
+  <PropertyGroup>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Protocol\*.cs" Link="Protocol\%(Filename)%(Extension)" />
+    <Compile Include="..\..\Endpoint\*.cs" Link="Endpoint\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

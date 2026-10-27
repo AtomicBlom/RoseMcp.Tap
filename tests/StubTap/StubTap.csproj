@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A tap that does nothing but say what was done to it, so the endpoint's tests can watch it be loaded,
+       started, restarted, replaced and stopped. Loaded by path, never referenced, or it would already be in
+       the test process's own context and the endpoint would never load it. -->
+
+</Project>

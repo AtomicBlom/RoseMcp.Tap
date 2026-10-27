@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/AotCheck/AotCheck.csproj" />
+    <Project Path="tests/RoseMcp.Tap.Tests/RoseMcp.Tap.Tests.csproj" />
+    <Project Path="tests/StubTap/StubTap.csproj" />
+  </Folder>
+</Solution>
