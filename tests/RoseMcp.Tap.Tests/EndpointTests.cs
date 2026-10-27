@@ -139,6 +139,22 @@ public sealed class EndpointTests
 		}
 	}
 
+	/// <summary>
+	/// A pipe something else created under the endpoint's name is the impostor a host checks for, so the
+	/// endpoint refuses to join it and says so rather than listening behind it.
+	/// </summary>
+	[Test]
+	public async Task Does_not_listen_behind_a_pipe_another_holder_created_first()
+	{
+		var name = Session.NewPipeName();
+		await using var impostor = new NamedPipeServerStream(name, PipeDirection.InOut, 2, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+		var said = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+		using var endpoint = TapEndpoint.Start(name, "Stub", "1.2.3", line => said.TrySetResult(line));
+
+		(await said.Task.WaitAsync(TimeSpan.FromSeconds(5))).ShouldStartWith($"Could not listen on {name}");
+	}
+
 	private static string TempFile()
 	{
 		var path = Path.Combine(Path.GetTempPath(), $"rosemcp-tap-test-{Guid.NewGuid():N}.log");

@@ -74,30 +74,27 @@ internal sealed class TapEndpoint : IDisposable
 	[RequiresDynamicCode(LoadsCode)]
 	private void Run() => RunAsync(_stopping.Token).GetAwaiter().GetResult();
 
+	/// <summary>
+	/// Accepts one host at a time, with the next instance of the pipe already listening while the current
+	/// host is served.
+	/// <para>
+	/// Two instances rather than one, because off Windows a pipe is a Unix domain socket whose listener
+	/// closes with the last instance of the name. A host that connects in the moment between one instance
+	/// going and the next being made is accepted by the old listener and then dropped with it, and reads
+	/// the endpoint's greeting as a closed pipe. Only the current instance is ever served, so requests are
+	/// still answered one host at a time.
+	/// </para>
+	/// </summary>
 	[RequiresUnreferencedCode(LoadsCode)]
 	[RequiresDynamicCode(LoadsCode)]
 	private async Task RunAsync(CancellationToken stopping)
 	{
-		while (!stopping.IsCancellationRequested)
+		var next = Listen(first: true);
+
+		while (next is not null && !stopping.IsCancellationRequested)
 		{
-			NamedPipeServerStream server;
-			try
-			{
-				server = new NamedPipeServerStream(
-					PipeName,
-					PipeDirection.InOut,
-					maxNumberOfServerInstances: 1,
-					PipeTransmissionMode.Byte,
-					PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-			}
-			catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-			{
-				// Another process already holds the name. Said and given up on rather than retried: a pipe
-				// named for this process's id that something else created is exactly the impostor the host
-				// checks for, and listening behind it would only hide that.
-				_log?.Invoke($"Could not listen on {PipeName}: {exception.Message}");
-				return;
-			}
+			var server = next;
+			next = null;
 
 			await using (server.ConfigureAwait(false))
 			{
@@ -112,8 +109,11 @@ internal sealed class TapEndpoint : IDisposable
 				catch (IOException exception)
 				{
 					_log?.Invoke($"A connection to {PipeName} failed before it was served: {exception.Message}");
+					next = Listen(first: false);
 					continue;
 				}
+
+				next = Listen(first: false);
 
 				try
 				{
@@ -124,6 +124,33 @@ internal sealed class TapEndpoint : IDisposable
 					_log?.Invoke($"The host on {PipeName} went before it was answered: {exception.Message}");
 				}
 			}
+		}
+
+		if (next is not null) await next.DisposeAsync().ConfigureAwait(false);
+	}
+
+	/// <summary>
+	/// A new instance of the pipe, or null when one cannot be made.
+	/// <para>
+	/// The first is made as the first instance of the name, so a pipe some other process already created
+	/// under it is refused rather than joined. Said and given up on rather than retried: a pipe named for
+	/// this process's id that something else created is exactly the impostor the host checks for, and
+	/// listening behind it would only hide that.
+	/// </para>
+	/// </summary>
+	private NamedPipeServerStream? Listen(bool first)
+	{
+		var options = PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly;
+		if (first) options |= PipeOptions.FirstPipeInstance;
+
+		try
+		{
+			return new NamedPipeServerStream(PipeName, PipeDirection.InOut, maxNumberOfServerInstances: 2, PipeTransmissionMode.Byte, options);
+		}
+		catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+		{
+			_log?.Invoke($"Could not listen on {PipeName}: {exception.Message}");
+			return null;
 		}
 	}
 
