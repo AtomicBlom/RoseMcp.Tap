@@ -9,13 +9,13 @@ namespace RoseMcp.Tap.Tests;
 /// </summary>
 public sealed class CapabilityTests
 {
-	private const string SUIseiLine =
+	private const string ContosoLine =
 		"tree properties properties.writable apply:SetProperty,ClearProperty,AddChild,RemoveChild select:pick,rulers selecthandle deselect selection ask detach";
 
 	[Test]
 	public void Commands_modes_and_finer_capabilities_are_read_from_one_line()
 	{
-		var capabilities = TapCapabilities.Parse(SUIseiLine);
+		var capabilities = TapCapabilities.Parse(ContosoLine);
 
 		capabilities.Serves(TapCommands.Tree).ShouldBeTrue();
 		capabilities.Serves(TapCommands.PropertiesWritable).ShouldBeTrue();
@@ -26,7 +26,7 @@ public sealed class CapabilityTests
 	[Test]
 	public void What_is_missing_is_not_served()
 	{
-		var capabilities = TapCapabilities.Parse(SUIseiLine);
+		var capabilities = TapCapabilities.Parse(ContosoLine);
 
 		capabilities.Serves(TapCommands.Changes).ShouldBeFalse();
 		capabilities.Serves(TapCommands.Apply, TapCommands.SetResource).ShouldBeFalse();
@@ -57,7 +57,7 @@ public sealed class CapabilityTests
 	[Test]
 	public void The_line_written_is_the_line_read()
 	{
-		var written = TapCapabilities.Parse(SUIseiLine).ToString();
+		var written = TapCapabilities.Parse(ContosoLine).ToString();
 
 		TapCapabilities.Parse(written).ToString().ShouldBe(written);
 		TapCapabilities.Of("tree", "select:rulers,pick").ToString().ShouldBe("select:pick,rulers tree");
@@ -66,7 +66,7 @@ public sealed class CapabilityTests
 	[Test]
 	public void A_greeting_carries_its_version_key_and_capabilities()
 	{
-		var greeting = TapGreeting.Write("a1b2", TapCapabilities.Parse(SUIseiLine));
+		var greeting = TapGreeting.Write("a1b2", TapCapabilities.Parse(ContosoLine));
 
 		TapGreeting.TryRead(greeting, out var version, out var key, out var capabilities).ShouldBeTrue();
 		version.ShouldBe(TapGreeting.ProtocolVersion);

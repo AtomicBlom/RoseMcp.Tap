@@ -29,7 +29,7 @@ The endpoint loads code by name, so it is annotated `RequiresUnreferencedCode` a
 A tap is one managed assembly marked with the attribute RoseMCP reads from its metadata, without loading it:
 
 ```csharp
-[assembly: RoseMcpTap(Name = "SUIsei", Module = "SUIsei.dll", Endpoint = "suisei-diag-{pid}", EntryType = "SUIsei.RoseTap.Tap", Protocol = 5)]
+[assembly: RoseMcpTap(Name = "Contoso", Module = "Contoso.dll", Endpoint = "contoso-diag-{pid}", EntryType = "Contoso.RoseTap.Tap", Protocol = 5)]
 ```
 
 The entry type has a public static `Start(string startupData)` and a public static `Stop()`. The startup data is `workDir|pipeName|key`. The tap connects to the host's pipe and greets it with `TapGreeting.Write(key, capabilities)`. It then answers each command in `TapCommands` with the rows in `TapRows`.

@@ -49,7 +49,7 @@ static class EndpointWire
 	/// <summary>The answer to <see cref="Load"/> when nothing was started, with the reason.</summary>
 	public const string Refused = "refused";
 
-	/// <summary>The pipe an endpoint listens on in process <paramref name="pid"/>, from a pattern such as <c>suisei-diag-{pid}</c>.</summary>
+	/// <summary>The pipe an endpoint listens on in process <paramref name="pid"/>, from a pattern such as <c>contoso-diag-{pid}</c>.</summary>
 	public static string PipeName(string pattern, int pid) =>
 		pattern.Replace("{pid}", pid.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal);
 

@@ -11,15 +11,15 @@ public sealed class RowTests
 	[Test]
 	public void A_tree_row_puts_each_field_where_the_host_reads_it()
 	{
-		var fields = TapWire.Fields(TapRows.Tree(7, 3, 2, "SUIsei.Controls.Button", "Ok", "Views/Main.xaml", 12, 5, "#Panel/Button[1]"));
+		var fields = TapWire.Fields(TapRows.Tree(7, 3, 2, "Contoso.Controls.Button", "Ok", "Views/Main.xaml", 12, 5, "#Panel/Button[1]"));
 
-		fields.ShouldBe(["7", "3", "2", "SUIsei.Controls.Button", "Ok", "Views/Main.xaml", "12", "5", "#Panel/Button[1]"]);
+		fields.ShouldBe(["7", "3", "2", "Contoso.Controls.Button", "Ok", "Views/Main.xaml", "12", "5", "#Panel/Button[1]"]);
 	}
 
 	[Test]
 	public void A_property_row_flags_a_null_value_and_leaves_the_writable_field_off_unless_asked()
 	{
-		var fields = TapWire.Fields(TapRows.Property("Tag", null, "Object", "SUIsei.FrameworkElement", "Default", string.Empty, 0, 0, false, null));
+		var fields = TapWire.Fields(TapRows.Property("Tag", null, "Object", "Contoso.FrameworkElement", "Default", string.Empty, 0, 0, false, null));
 
 		fields.Length.ShouldBe(11);
 		fields[0].ShouldBe("P");
@@ -32,7 +32,7 @@ public sealed class RowTests
 	public void A_property_row_from_a_tap_that_declares_writable_carries_the_reason_last()
 	{
 		var fields = TapWire.Fields(TapRows.Property(
-			"Text", "a\tb", "String", "SUIsei.Controls.TextBlock", "Local", "Main.xaml", 4, 9, false, "set by a compiled {x:Bind}"));
+			"Text", "a\tb", "String", "Contoso.Controls.TextBlock", "Local", "Main.xaml", 4, 9, false, "set by a compiled {x:Bind}"));
 
 		fields.Length.ShouldBe(12);
 		fields[2].ShouldBe("a\tb");
@@ -66,19 +66,19 @@ public sealed class RowTests
 	[Test]
 	public void An_endpoint_exchange_reads_back_as_it_was_written()
 	{
-		EndpointWire.TryReadGreeting(EndpointWire.Greeting("SUIsei", "0.1.0"), out var version, out var framework, out var frameworkVersion).ShouldBeTrue();
+		EndpointWire.TryReadGreeting(EndpointWire.Greeting("Contoso", "0.1.0"), out var version, out var framework, out var frameworkVersion).ShouldBeTrue();
 		version.ShouldBe(EndpointWire.Version);
-		framework.ShouldBe("SUIsei");
+		framework.ShouldBe("Contoso");
 		frameworkVersion.ShouldBe("0.1.0");
 
-		EndpointWire.TryReadLoadRequest(EndpointWire.LoadRequest(@"C:\taps\SUIsei.RoseTap.dll", "SUIsei.RoseTap.Tap", @"C:\work|pipe|key"), out var path, out var entry, out var data)
+		EndpointWire.TryReadLoadRequest(EndpointWire.LoadRequest(@"C:\taps\Contoso.RoseTap.dll", "Contoso.RoseTap.Tap", @"C:\work|pipe|key"), out var path, out var entry, out var data)
 			.ShouldBeTrue();
-		path.ShouldBe(@"C:\taps\SUIsei.RoseTap.dll");
-		entry.ShouldBe("SUIsei.RoseTap.Tap");
+		path.ShouldBe(@"C:\taps\Contoso.RoseTap.dll");
+		entry.ShouldBe("Contoso.RoseTap.Tap");
 		data.ShouldBe(@"C:\work|pipe|key");
 
-		EndpointWire.ReadReply(EndpointWire.LoadedReply("SUIsei", "0.1.0")).ShouldBe((true, "0.1.0"));
+		EndpointWire.ReadReply(EndpointWire.LoadedReply("Contoso", "0.1.0")).ShouldBe((true, "0.1.0"));
 		EndpointWire.ReadReply(EndpointWire.RefusedReply("no such type")).ShouldBe((false, "no such type"));
-		EndpointWire.PipeName("suisei-diag-{pid}", 4120).ShouldBe("suisei-diag-4120");
+		EndpointWire.PipeName("contoso-diag-{pid}", 4120).ShouldBe("contoso-diag-4120");
 	}
 }

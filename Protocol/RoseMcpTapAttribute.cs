@@ -6,7 +6,7 @@ namespace RoseMcp.Tap.Protocol;
 /// the tap in its own processes: the tap only ever runs inside the app it serves.
 /// <para>
 /// <code>
-/// [assembly: RoseMcpTap(Name = "SUIsei", Module = "SUIsei.dll", Endpoint = "suisei-diag-{pid}", EntryType = "SUIsei.RoseTap.Tap", Protocol = 5)]
+/// [assembly: RoseMcpTap(Name = "Contoso", Module = "Contoso.dll", Endpoint = "contoso-diag-{pid}", EntryType = "Contoso.RoseTap.Tap", Protocol = 5)]
 /// </code>
 /// </para>
 /// </summary>
@@ -18,19 +18,19 @@ internal
 #endif
 sealed class RoseMcpTapAttribute : Attribute
 {
-	/// <summary>The framework the tap serves, as it should read in an error: <c>SUIsei</c>.</summary>
+	/// <summary>The framework the tap serves, as it should read in an error: <c>Contoso</c>.</summary>
 	public string Name { get; set; } = string.Empty;
 
 	/// <summary>
 	/// The file name of the framework's own assembly, which a target serving it has loaded:
-	/// <c>SUIsei.dll</c>. What lets RoseMCP say a target runs the framework but has no endpoint
+	/// <c>Contoso.dll</c>. What lets RoseMCP say a target runs the framework but has no endpoint
 	/// listening, rather than that nothing serves it.
 	/// </summary>
 	public string Module { get; set; } = string.Empty;
 
 	/// <summary>
 	/// The pipe the framework's diagnostics endpoint listens on in a target, with <c>{pid}</c> standing
-	/// for the target's process id: <c>suisei-diag-{pid}</c>.
+	/// for the target's process id: <c>contoso-diag-{pid}</c>.
 	/// </summary>
 	public string Endpoint { get; set; } = string.Empty;
 
