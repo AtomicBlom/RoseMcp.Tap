@@ -25,7 +25,17 @@ internal sealed class TapLoader
 	private static readonly StringComparison PathComparison =
 		OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
+	private readonly string[]? _directories;
 	private Loaded? _current;
+
+	/// <summary>
+	/// A loader that loads taps only from <paramref name="directories"/> and the folders beneath them, or
+	/// from anywhere when that is null.
+	/// </summary>
+	public TapLoader(IReadOnlyCollection<string>? directories = null)
+	{
+		_directories = directories?.Select(directory => Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory))).ToArray();
+	}
 
 	/// <summary>
 	/// Loads the tap at <paramref name="assemblyPath"/>, or keeps the one already loaded from it, and calls
@@ -46,6 +56,7 @@ internal sealed class TapLoader
 			return $"'{assemblyPath}' is not a path this endpoint can read: {exception.Message}";
 		}
 
+		if (!IsInTapDirectory(file)) return $"{file.FullName} is not in a folder this endpoint loads taps from.";
 		if (!file.Exists) return $"There is no tap at {file.FullName}.";
 
 		var isCurrent = _current is { } current
@@ -76,6 +87,15 @@ internal sealed class TapLoader
 		return null;
 	}
 
+	private bool IsInTapDirectory(FileInfo file)
+	{
+		if (_directories is null) return true;
+
+		var folder = Path.TrimEndingDirectorySeparator(file.DirectoryName ?? string.Empty);
+		return _directories.Any(directory => string.Equals(folder, directory, PathComparison)
+			|| folder.StartsWith(directory + Path.DirectorySeparatorChar, PathComparison));
+	}
+
 	/// <summary>Stops the loaded tap and unloads its context. Nothing to do where none is loaded.</summary>
 	public void Stop()
 	{
@@ -102,9 +122,12 @@ internal sealed class TapLoader
 	[RequiresDynamicCode(LoadsCode)]
 	private static (Loaded? Loaded, string? Refusal) LoadNew(FileInfo file, string entryType)
 	{
-		var context = new TapLoadContext(file.DirectoryName ?? ".");
+		TapLoadContext? context = null;
 		try
 		{
+			// Made inside the try: where code cannot be loaded at all, as under NativeAOT, making the context
+			// is what throws.
+			context = new TapLoadContext(file.DirectoryName ?? ".");
 			var assembly = context.LoadFromBytes(file.FullName);
 
 			var type = assembly.GetType(entryType, throwOnError: false);
@@ -124,11 +147,15 @@ internal sealed class TapLoader
 		{
 			return Refuse(context, $"{file.Name} could not be loaded: {exception.Message}");
 		}
+		catch (Exception exception)
+		{
+			return Refuse(context, $"{file.Name} could not be loaded: {exception.GetType().Name}: {exception.Message}");
+		}
 	}
 
-	private static (Loaded?, string?) Refuse(TapLoadContext context, string reason)
+	private static (Loaded?, string?) Refuse(TapLoadContext? context, string reason)
 	{
-		context.Unload();
+		context?.Unload();
 		return (null, reason);
 	}
 
