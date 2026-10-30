@@ -123,6 +123,56 @@ public sealed class EndpointTests
 		reply.Detail.ShouldContain("'unload'");
 	}
 
+	/// <summary>
+	/// A load that fails in a way the loader did not foresee -- an empty type name, which reflection rejects
+	/// by throwing -- is refused, and the endpoint goes on serving, rather than the exception ending the app.
+	/// </summary>
+	[Test]
+	public async Task A_load_that_throws_unforeseen_is_refused_and_the_endpoint_keeps_serving()
+	{
+		await using var session = await Session.OpenAsync();
+
+		var refused = EndpointWire.ReadReply(await session.AskAsync(EndpointWire.LoadRequest(StubTap, string.Empty, TempFile())));
+		var loaded = EndpointWire.ReadReply(await session.AskAsync(EndpointWire.LoadRequest(StubTap, "StubTap.Entry", TempFile())));
+
+		refused.Loaded.ShouldBeFalse();
+		refused.Detail.ShouldContain("ArgumentException");
+		loaded.Loaded.ShouldBeTrue();
+	}
+
+	[Test]
+	public async Task With_tap_folders_a_tap_anywhere_else_is_refused()
+	{
+		var copy = CopyOfStub();
+		await using var session = await Session.OpenAsync([Path.GetDirectoryName(copy)!]);
+
+		var elsewhere = EndpointWire.ReadReply(await session.AskAsync(EndpointWire.LoadRequest(StubTap, "StubTap.Entry", TempFile())));
+		var inside = EndpointWire.ReadReply(await session.AskAsync(EndpointWire.LoadRequest(copy, "StubTap.Entry", TempFile())));
+
+		elsewhere.Loaded.ShouldBeFalse();
+		elsewhere.Detail.ShouldContain("is not in a folder this endpoint loads taps from");
+		inside.Loaded.ShouldBeTrue();
+	}
+
+	/// <summary>A folder's name is not a prefix of another's: <c>taps</c> lets nothing in from <c>taps-old</c>.</summary>
+	[Test]
+	public async Task A_tap_folder_covers_the_folders_beneath_it_and_no_sibling_sharing_its_name()
+	{
+		var copy = CopyOfStub();
+		var folder = Path.GetDirectoryName(copy)!;
+		var beneath = Directory.CreateDirectory(Path.Combine(folder, "nested")).FullName;
+		File.Copy(copy, Path.Combine(beneath, Path.GetFileName(copy)));
+		var sibling = Directory.CreateDirectory(folder + "-old").FullName;
+		File.Copy(copy, Path.Combine(sibling, Path.GetFileName(copy)));
+		await using var session = await Session.OpenAsync([folder + Path.DirectorySeparatorChar]);
+
+		var nested = EndpointWire.ReadReply(await session.AskAsync(EndpointWire.LoadRequest(Path.Combine(beneath, Path.GetFileName(copy)), "StubTap.Entry", TempFile())));
+		var next = EndpointWire.ReadReply(await session.AskAsync(EndpointWire.LoadRequest(Path.Combine(sibling, Path.GetFileName(copy)), "StubTap.Entry", TempFile())));
+
+		nested.Loaded.ShouldBeTrue();
+		next.Loaded.ShouldBeFalse();
+	}
+
 	[Test]
 	public async Task Serves_one_host_after_another()
 	{
@@ -188,10 +238,10 @@ public sealed class EndpointTests
 
 		public static string NewPipeName() => $"rosemcp-tap-test-{Guid.NewGuid():N}";
 
-		public static async Task<Session> OpenAsync()
+		public static async Task<Session> OpenAsync(IReadOnlyCollection<string>? tapDirectories = null)
 		{
 			var name = NewPipeName();
-			var endpoint = TapEndpoint.Start(name, "Stub", "1.2.3");
+			var endpoint = TapEndpoint.Start(name, "Stub", "1.2.3", tapDirectories: tapDirectories);
 			var client = await ConnectAsync(name);
 			var greeting = await TapWire.ReadMessageAsync(client, CancellationToken.None);
 

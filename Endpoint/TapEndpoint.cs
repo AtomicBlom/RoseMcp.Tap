@@ -16,10 +16,17 @@ namespace RoseMcp.Tap.Endpoint;
 /// the framework through the framework's own public diagnostics API, not through anything passed here.
 /// </para>
 /// <para>
-/// The pipe is created for the current user only. Anyone running as that user can already debug the app
-/// or inject a library into it, so the endpoint grants nothing new; the host still checks that the
-/// process serving the pipe is its target before it sends anything, because a process that created the
-/// name first would otherwise be handed the host's pipe and key.
+/// The pipe is created for the current user only. On Windows, anyone running as that user can already
+/// debug the app or inject a library into it; elsewhere that is not always so (Linux's Yama
+/// <c>ptrace_scope</c>, macOS's hardened runtime), and there the endpoint lets that user run code in the
+/// app. A framework that would rather not starts it with the folders taps may be loaded from, and every
+/// other path is refused. The host still checks that the process serving the pipe is its target before it
+/// sends anything, because a process that created the name first would otherwise be handed the host's
+/// pipe and key.
+/// </para>
+/// <para>
+/// Nothing a request does can end the app: a load that fails in a way nothing here foresaw is refused,
+/// and anything else that escapes is said and the host dropped.
 /// </para>
 /// <para>
 /// One connection at a time, on a background thread of its own. An idle endpoint costs that one blocked
@@ -34,17 +41,18 @@ internal sealed class TapEndpoint : IDisposable
 	private readonly string _frameworkVersion;
 	private readonly Action<string>? _log;
 	private readonly CancellationTokenSource _stopping = new();
-	private readonly TapLoader _loader = new();
+	private readonly TapLoader _loader;
 	private readonly Thread _thread;
 
 	[RequiresUnreferencedCode(LoadsCode)]
 	[RequiresDynamicCode(LoadsCode)]
-	private TapEndpoint(string pipeName, string framework, string frameworkVersion, Action<string>? log)
+	private TapEndpoint(string pipeName, string framework, string frameworkVersion, Action<string>? log, IReadOnlyCollection<string>? tapDirectories)
 	{
 		PipeName = pipeName;
 		_framework = framework;
 		_frameworkVersion = frameworkVersion;
 		_log = log;
+		_loader = new TapLoader(tapDirectories);
 
 		_thread = new Thread(Run)
 		{
@@ -59,20 +67,34 @@ internal sealed class TapEndpoint : IDisposable
 	/// <summary>
 	/// Starts listening on <paramref name="pipeName"/>, announcing <paramref name="framework"/> at
 	/// <paramref name="frameworkVersion"/> to every host that connects. <paramref name="log"/> hears what
-	/// the endpoint does and why it refused anything, on the endpoint's own thread.
+	/// the endpoint does and why it refused anything, on the endpoint's own thread. With
+	/// <paramref name="tapDirectories"/>, a tap is loaded only from one of those folders or a folder beneath
+	/// one; without, from any path the app can read.
 	/// </summary>
 	[RequiresUnreferencedCode(LoadsCode)]
 	[RequiresDynamicCode(LoadsCode)]
-	public static TapEndpoint Start(string pipeName, string framework, string frameworkVersion, Action<string>? log = null)
+	public static TapEndpoint Start(string pipeName, string framework, string frameworkVersion, Action<string>? log = null,
+		IReadOnlyCollection<string>? tapDirectories = null)
 	{
-		var endpoint = new TapEndpoint(pipeName, framework, frameworkVersion, log);
+		var endpoint = new TapEndpoint(pipeName, framework, frameworkVersion, log, tapDirectories);
 		endpoint._thread.Start();
 		return endpoint;
 	}
 
 	[RequiresUnreferencedCode(LoadsCode)]
 	[RequiresDynamicCode(LoadsCode)]
-	private void Run() => RunAsync(_stopping.Token).GetAwaiter().GetResult();
+	private void Run()
+	{
+		try
+		{
+			RunAsync(_stopping.Token).GetAwaiter().GetResult();
+		}
+		catch (Exception exception)
+		{
+			// An exception leaving this thread would end the app, which is worse than an endpoint that stops.
+			_log?.Invoke($"The endpoint on {PipeName} stopped: {exception.GetType().Name}: {exception.Message}");
+		}
+	}
 
 	/// <summary>
 	/// Accepts one host at a time, with the next instance of the pipe already listening while the current
@@ -123,6 +145,10 @@ internal sealed class TapEndpoint : IDisposable
 				{
 					_log?.Invoke($"The host on {PipeName} went before it was answered: {exception.Message}");
 				}
+				catch (Exception exception)
+				{
+					_log?.Invoke($"Serving the host on {PipeName} failed, so it was dropped: {exception.GetType().Name}: {exception.Message}");
+				}
 			}
 		}
 
@@ -169,7 +195,18 @@ internal sealed class TapEndpoint : IDisposable
 			string reply;
 			if (EndpointWire.TryReadLoadRequest(request, out var assemblyPath, out var entryType, out var startupData))
 			{
-				reply = _loader.Load(assemblyPath, entryType, startupData) is { } refusal
+				string? refusal;
+				try
+				{
+					refusal = _loader.Load(assemblyPath, entryType, startupData);
+				}
+				catch (Exception exception)
+				{
+					// A failure the loader did not foresee: the host is told, rather than the exception ending the app.
+					refusal = $"Loading {entryType} from '{assemblyPath}' threw {exception.GetType().Name}: {exception.Message}";
+				}
+
+				reply = refusal is not null
 					? EndpointWire.RefusedReply(refusal)
 					: EndpointWire.LoadedReply(_framework, _frameworkVersion);
 			}
