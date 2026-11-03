@@ -24,6 +24,8 @@ Every type is `internal`, so two assemblies that each compile a copy never clash
 
 The endpoint loads code by name, so it is annotated `RequiresUnreferencedCode` and `RequiresDynamicCode`. A framework that stays NativeAOT-clean starts it behind a feature switch marked `[FeatureGuard]` for both, which keeps its analyzers quiet and lets the trimmer remove the endpoint wherever the switch is off. `tests/AotCheck` compiles the contract with the AOT analyzers on to keep those annotations complete.
 
+`TapEndpoint.Start` takes the folders a tap may be loaded from. Without them it loads a tap from any path the app can read, which lets anyone running as the app's user run code in it. On Windows that user can already debug the app; under Linux's Yama `ptrace_scope` or macOS's hardened runtime they cannot. A request the endpoint can't serve is refused rather than thrown, so nothing a host sends ends the app.
+
 ## A tap
 
 A tap is one managed assembly marked with the attribute RoseMCP reads from its metadata, without loading it:
