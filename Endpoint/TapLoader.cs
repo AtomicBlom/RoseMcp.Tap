@@ -30,7 +30,10 @@ internal sealed class TapLoader
 
 	/// <summary>
 	/// A loader that loads taps only from <paramref name="directories"/> and the folders beneath them, or
-	/// from anywhere when that is null.
+	/// from anywhere when that is null. Symbolic links and junctions are followed to where they lead, in
+	/// the tap's path and in each folder's, before the two are compared: a link inside a tap folder to a
+	/// file elsewhere does not let that file in, and a tap folder that is itself a link covers what it
+	/// leads to.
 	/// </summary>
 	public TapLoader(IReadOnlyCollection<string>? directories = null)
 	{
@@ -49,9 +52,9 @@ internal sealed class TapLoader
 		FileInfo file;
 		try
 		{
-			file = new FileInfo(assemblyPath);
+			file = new FileInfo(ResolveLinks(assemblyPath));
 		}
-		catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException or UnauthorizedAccessException)
+		catch (Exception exception) when (exception is ArgumentException or NotSupportedException or IOException or UnauthorizedAccessException)
 		{
 			return $"'{assemblyPath}' is not a path this endpoint can read: {exception.Message}";
 		}
@@ -87,14 +90,65 @@ internal sealed class TapLoader
 		return null;
 	}
 
+	/// <summary>
+	/// Whether <paramref name="file"/>, whose path has its links resolved already, is in one of the tap
+	/// folders or a folder beneath one. Each folder's links are resolved as it is asked, since a link can
+	/// be changed while the app runs, and the folder is compared whole: <c>taps</c> does not cover
+	/// <c>taps-old</c>.
+	/// </summary>
 	private bool IsInTapDirectory(FileInfo file)
 	{
 		if (_directories is null) return true;
 
-		var folder = Path.TrimEndingDirectorySeparator(file.DirectoryName ?? string.Empty);
-		return _directories.Any(directory => string.Equals(folder, directory, PathComparison)
-			|| folder.StartsWith(directory + Path.DirectorySeparatorChar, PathComparison));
+		var folder = WithEndingSeparator(file.DirectoryName ?? string.Empty);
+		return _directories.Any(directory => folder.StartsWith(WithEndingSeparator(ResolveLinks(directory)), PathComparison));
 	}
+
+	/// <summary>
+	/// <paramref name="path"/> made full, with every symbolic link and junction along it, the last part
+	/// and every folder above it, replaced by what it finally leads to: where the file really is, which a
+	/// test of its folder has to see rather than the path it was asked by. From the first part that does
+	/// not exist on, the path is kept as written, since nothing there can be loaded.
+	/// </summary>
+	/// <exception cref="IOException">The links lead round in a loop, or through more links than a path may.</exception>
+	internal static string ResolveLinks(string path) => ResolveLinks(path, 0);
+
+	private static string ResolveLinks(string path, int linksFollowed)
+	{
+		var full = Path.GetFullPath(path);
+		var root = Path.GetPathRoot(full) ?? string.Empty;
+		var parts = full[root.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+
+		var resolved = root;
+		for (var index = 0; index < parts.Length; index++)
+		{
+			var next = Path.Combine(resolved, parts[index]);
+			var target = Directory.Exists(next) ? Directory.ResolveLinkTarget(next, returnFinalTarget: true)
+				: File.Exists(next) ? File.ResolveLinkTarget(next, returnFinalTarget: true)
+				: null;
+
+			if (target is not null)
+			{
+				// The target is resolved in turn, since a folder above it may be a link too.
+				if (++linksFollowed > MaxLinks) throw new IOException($"{path} leads through more than {MaxLinks} links.");
+				next = ResolveLinks(target.FullName, linksFollowed);
+			}
+			else if (!Path.Exists(next))
+			{
+				return Path.Join([resolved, .. parts[index..]]);
+			}
+
+			resolved = next;
+		}
+
+		return resolved;
+	}
+
+	/// <summary>The most links one path is followed through, as many as Linux follows.</summary>
+	private const int MaxLinks = 40;
+
+	private static string WithEndingSeparator(string folder) =>
+		Path.EndsInDirectorySeparator(folder) ? folder : folder + Path.DirectorySeparatorChar;
 
 	/// <summary>Stops the loaded tap and unloads its context. Nothing to do where none is loaded.</summary>
 	public void Stop()
