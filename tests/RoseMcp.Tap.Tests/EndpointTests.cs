@@ -173,6 +173,59 @@ public sealed class EndpointTests
 		next.Loaded.ShouldBeFalse();
 	}
 
+	/// <summary>
+	/// A link inside a tap folder is judged by where it leads: neither a linked folder nor a linked file
+	/// lets in a tap that sits elsewhere.
+	/// </summary>
+	[Test]
+	public async Task A_link_inside_a_tap_folder_lets_in_nothing_from_outside_it()
+	{
+		var outside = CopyOfStub();
+		var folder = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"rosemcp-tap-test-{Guid.NewGuid():N}")).FullName;
+		var linkedFolder = Path.Combine(folder, "linked");
+		var linkedFile = Path.Combine(folder, Path.GetFileName(outside));
+		Link(() => Directory.CreateSymbolicLink(linkedFolder, Path.GetDirectoryName(outside)!));
+		Link(() => File.CreateSymbolicLink(linkedFile, outside));
+		await using var session = await Session.OpenAsync([folder]);
+
+		var throughFolder = EndpointWire.ReadReply(await session.AskAsync(EndpointWire.LoadRequest(Path.Combine(linkedFolder, Path.GetFileName(outside)), "StubTap.Entry", TempFile())));
+		var throughFile = EndpointWire.ReadReply(await session.AskAsync(EndpointWire.LoadRequest(linkedFile, "StubTap.Entry", TempFile())));
+
+		throughFolder.Loaded.ShouldBeFalse();
+		throughFolder.Detail.ShouldContain("is not in a folder this endpoint loads taps from");
+		throughFile.Loaded.ShouldBeFalse();
+		throughFile.Detail.ShouldContain("is not in a folder this endpoint loads taps from");
+	}
+
+	/// <summary>A tap folder that is a link covers the folder it leads to, asked for by either path.</summary>
+	[Test]
+	public async Task A_tap_folder_that_is_a_link_covers_where_it_leads()
+	{
+		var copy = CopyOfStub();
+		var link = Path.Combine(Path.GetTempPath(), $"rosemcp-tap-test-{Guid.NewGuid():N}");
+		Link(() => Directory.CreateSymbolicLink(link, Path.GetDirectoryName(copy)!));
+		await using var session = await Session.OpenAsync([link]);
+
+		var byTarget = EndpointWire.ReadReply(await session.AskAsync(EndpointWire.LoadRequest(copy, "StubTap.Entry", TempFile())));
+		var byLink = EndpointWire.ReadReply(await session.AskAsync(EndpointWire.LoadRequest(Path.Combine(link, Path.GetFileName(copy)), "StubTap.Entry", TempFile())));
+
+		byTarget.Loaded.ShouldBeTrue(byTarget.Detail);
+		byLink.Loaded.ShouldBeTrue(byLink.Detail);
+	}
+
+	/// <summary>Makes a link, or skips the test where this user may not, as on Windows without Developer Mode.</summary>
+	private static void Link(Func<FileSystemInfo> create)
+	{
+		try
+		{
+			create();
+		}
+		catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
+		{
+			Skip.Test($"This user cannot make symbolic links here: {exception.Message}");
+		}
+	}
+
 	[Test]
 	public async Task Serves_one_host_after_another()
 	{

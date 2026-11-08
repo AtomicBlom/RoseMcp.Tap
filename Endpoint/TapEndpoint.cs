@@ -69,7 +69,8 @@ internal sealed class TapEndpoint : IDisposable
 	/// <paramref name="frameworkVersion"/> to every host that connects. <paramref name="log"/> hears what
 	/// the endpoint does and why it refused anything, on the endpoint's own thread. With
 	/// <paramref name="tapDirectories"/>, a tap is loaded only from one of those folders or a folder beneath
-	/// one; without, from any path the app can read.
+	/// one, judged by where symbolic links and junctions in either path lead; without, from any path the app
+	/// can read.
 	/// </summary>
 	[RequiresUnreferencedCode(LoadsCode)]
 	[RequiresDynamicCode(LoadsCode)]
